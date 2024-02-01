@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 # abstraction class to facilitate message array management and prompt loading
 class ARCOpenAISolver:
     def __init__(self):
-        with open('/kaggle/input/prompts/sys_prompt.txt', 'r') as file:
+        with open('sys_prompt.txt', 'r') as file:
             self.sys_prompt = file.read()
         self.output_format_prompt = "Do not include any explanations, only provide a RFC8259 compliant JSON response following this format without deviation.\n"
         self.output_format_prompt += "{'output': <2D array representing a rectangular grid of integers ranging from 0 to 9>}"
@@ -89,16 +89,19 @@ def solve_arc_question(task_json, output_id):
     modified_task_json = copy.deepcopy(task_json)
     modified_task_json["test"][output_id]["output"] = "'to_be_filled'"
     user_prompt = "Here is a JSON of the input-output pairs\n{}".format(modified_task_json)
-    chatApp.chat(user_prompt=user_prompt)
+    verbose_response = chatApp.chat(user_prompt=user_prompt)
+    print(verbose_response.choices[0].message.content)
+    
     response = chatApp.strict_json()
 
-    output = flattener(response["output"])
+    output = response["output"]
     return output 
         
 # helper function to plot and visualize the input/output pairs in train set
-def show_image_from_json(task_json):
+def show_image_from_json(task_json, input, predicted, groundtruth):
     train_data = task_json['train']
-    fig, axs = plt.subplots(len(train_data), 2)
+    test_data = task_json['test']
+    fig, axs = plt.subplots(len(train_data) + 2, 2)
     for i, item in enumerate(train_data):
         input_image = np.array(item['input'])
         output_image = np.array(item['output'])
@@ -106,20 +109,17 @@ def show_image_from_json(task_json):
         axs[i, 0].set_title('Input Image')
         axs[i, 1].imshow(output_image, cmap='viridis')
         axs[i, 1].set_title('Output Image')
-        
-    plt.show()
-        
     
-def show_image_from_json(task_json):
-    train_data = task_json['train']
-    fig, axs = plt.subplots(len(train_data), 2)
-    for i, item in enumerate(train_data):
-        input_image = np.array(item['input'])
-        output_image = np.array(item['output'])
-        axs[i, 0].imshow(input_image, cmap='viridis')
-        axs[i, 0].set_title('Input Image')
-        axs[i, 1].imshow(output_image, cmap='viridis')
-        axs[i, 1].set_title('Output Image')
+    input_image = np.array(input)
+    predicted_image = np.array(predicted)
+    axs[-2, 0].set_title('Test Input')
+    axs[-2, 0].imshow(input_image, cmap='viridis')
+    axs[-2, 1].set_title('Predicted')
+    axs[-2, 1].imshow(predicted_image, cmap='viridis')
+    if groundtruth:
+      groundtruth_image = np.array(groundtruth)
+      axs[-1, 0].set_title('Groundtruth')
+      axs[-1, 0].imshow(groundtruth_image, cmap='viridis')
         
     plt.show()
 
@@ -136,7 +136,7 @@ if __name__ == "__main__":
         with open(os.path.join(folder, json_file), 'r') as f:
             task_data = json.load(f)
             task_id = json_file.split('.')[0]
-        
+
             # for each question within each task, append a flattened output
             # with the corresponding {task_id}_{output_id}
             for output_id, question in enumerate(task_data["test"]):
@@ -145,18 +145,23 @@ if __name__ == "__main__":
                     output = solve_arc_question(task_data, output_id)
                 except Exception as err:
                     print("Error encountered during answering for task {}, error: {}".format(task_id, err))
-                    output = "|0|"
+                    output = [[0]]
                     #raise err
+                groundtruth = None
+                if "output" in task_data["test"][output_id]:
+                    groundtruth = task_data["test"][output_id]["output"]
+                    print("predicted {} vs groundtrudth {}".format(flattener(output), flattener(groundtruth)))
+                    print("Pass? {}".format(flattener(output) == flattener(groundtruth)))
                 outputs.append(output)
                 output_ids.append("{}_{}".format(task_id, output_id))
-                print("{}, {}".format(output_ids[-1], outputs[-1]))
-            
-            # visualize task
-            #show_image_from_json(task_data)
+
+                test_input = task_data["test"][output_id]["input"]
+                show_image_from_json(task_data, test_input, output, groundtruth)
+
 
             # write out the submission.csv according to ARC requirement
             with open('submission.csv', 'w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(["output_id", "output"])
                 for i in range(len(output_ids)):
-                    writer.writerow([output_ids[i], outputs[i]])
+                    writer.writerow([output_ids[i], flattener(outputs[i])])

@@ -2,15 +2,21 @@ You are an expert puzzle solver. You love to solve puzzles using reasons and log
 You are given a series of inputs and output pairs.
 These are all in the form of a 2D array, representing a 2D grid, with values from 0-9.
 The input output pairs will come in a JSON in the following format:
-{"train": [{"input": <some 2d array>, "output": <some other 2d array}, ..., {"input": <some 2d array>, "output": <some other 2d array}], "test": [{"input": <some 2d array>, "output": <some other 2d array}, ..., {"input": <some 2d array>, "output": <some other 2d array}]}
+{"train": [{"input": <2d array>, "output": <2d array}, ..., {"input": <array>, "output": <2d array}], "test": [{"input": <2d array>, "output": <2d array}, ..., {"input": <array>, "output": <2d array}]}
 The values are not representative of any ordinal ranking.
 Input/output pairs may not reflect all possibilities, you are to infer the simplest possible relation making use of symmetry and invariance as much as possible.
 Do the following:
 Step 1. What is the general description of the input/output relation that holds true for all input/output pairs in "train" section of the json?
 Step 2. Based on the description above, what is the step by step instruction to transform the input to the output for each input-output pair in "train" section of the json?
-Step 3. Please use all of the input-output pairs in the "train" set as examples, to verify that your instruction works. If it fails for one of the pairs, go back to Step 2 to redesign your instructions.
-Step 4. Apply this description to the "input" of "test" section of the task json and find out the "output" answer to replace ’to_be_filled’.”
-Step 5: check if the answer to 'to_be_filled' is:
+        - Describe the changes between the input and output image sizes 
+        - Describe the changes between the input and output pixels, focusing on movement or pattern changes 
+Step 3. Apply this instruction to all of the input-output pairs in the "train" section, to verify that your instruction works.
+        - For each pair, apply your instruction step by step, and communicate clearly how each pixels are derived in the output based on the input. 
+        - After getting the output for the pair, print the predicted output and the true output side by side, and check if they are the same.
+        - If so, proceed to next step
+        - If it fails for one of the pairs, go back to Step 2 to redesign your instructions.
+Step 4. Apply this instruction to the "input" of "test" section of the task json and find out the answer 2d grid array to ’to_be_filled’.”
+Step 5: Reflect if the answer to 'to_be_filled' is:
         - a 2D array representing a 2D grid
         - with VALUES FROM 0-9 ONLY
         - each subarray in the in the 2D array has to have the same length
