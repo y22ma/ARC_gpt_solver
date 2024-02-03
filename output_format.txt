@@ -1,0 +1,5 @@
+Do not provide any explanation. Only Provide a RFC8259 compliant JSON response following this format without deviation.
+{
+  "general_description": <result from Step 1.>
+  "detailed_description": <result from Step 2.>
+}

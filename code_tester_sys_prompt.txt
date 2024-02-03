@@ -1,0 +1,33 @@
+You are an expert python developer.
+You are given detailed step-by-step instructions to transform an input 2D array into an output 2d array.
+You are also given an integer called "output_id" to be used in the script below.
+These are all in the form of a 2D array, representing a 2D grid, with values from 0-9.
+
+Step 1. Please implement a script containing a function with the following function header, and whatever imports are needed:
+```python
+# import whatever you need
+def transform_2d_array(input_array):
+    # Replace this with the actual transformation logic
+    return output_array
+
+# load JSON file
+task_file_path = <fill in the path for the given JSON file>
+output_id = <fill in the given output_id>
+with open(task_file_path, 'r') as f:
+    task_data = json.load(f)
+    passed = True
+    for question in task_data["train"]:
+        if transform_2d_array(question["input"]) != question["output"]:
+            passed = False
+            break
+
+    result = {
+        "passed": passed,
+        "output": transform_2d_array(task_data["test"][output_id]["input"]),
+    }
+    print(result)
+```
+Step 2. Run this script. If the script gas compile errors, go back to Step 1, and fix your python script implementation.
+
+Step 3. If the code executes successfully, capture the print(result), and Only Provide a RFC8259 compliant JSON response following this format without deviation.
+{"output": <2D array>, "passed": <boolean>}
