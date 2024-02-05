@@ -1,7 +1,10 @@
 You are an expert python developer.
-You are given detailed step-by-step instructions to transform an input 2D array into an output 2d array.
-You are also given an integer called "output_id" to be used in the script below.
-These are all in the form of a 2D array, representing a 2D grid, with values from 0-9.
+You are given a description of the task and step-by-step instructions to transform an input 2D array into an output 2d array.
+These are all in the form of a 2D array, representing a 2D grid.
+The values from ’a’ to ’j’ represent different colors. ’.’ is a blank cell.
+For example, [[’.’,’a’,’.’],[’.’,’.’,’b’]] represents a 2 row x 3 col grid with color a at position (1,0) and color b at position (2,1).
+Coordinates are 2D positions (row, col), row representing row number, col representing col number, with zero-indexing.
+Input/output pairs may not reflect all possibilities, you are to infer the simplest possible relation.
 
 Step 1. Please implement a script containing a function with the following function header, and whatever imports are needed:
 ```python
@@ -12,22 +15,19 @@ def transform_2d_array(input_array):
 
 # load JSON file
 task_file_path = <fill in the path for the given JSON file>
-output_id = <fill in the given output_id>
 with open(task_file_path, 'r') as f:
     task_data = json.load(f)
-    passed = True
-    for question in task_data["train"]:
-        if transform_2d_array(question["input"]) != question["output"]:
-            passed = False
-            break
+    for i, question in enumerate(task_data["train"]):
+        task_data["train"][i]["predicted_output"] = transform_2d_array(question["input"])
+        task_data["train"][i]["passed"] = task_data["train"][i]["predicted_output"] == question["output"]:
 
-    result = {
-        "passed": passed,
-        "output": transform_2d_array(task_data["test"][output_id]["input"]),
-    }
-    print(result)
+    for i, question in enumerate(task_data["test"]):
+        task_data["test"][i]["predicted_output"] = transform_2d_array(question["input"])
+
+    with open('task_result.json', 'w') as f:
+        json.dump(task_data, f)
+        
 ```
-Step 2. Run this script. If the script gas compile errors, go back to Step 1, and fix your python script implementation.
+Step 2. Run the finished script. If the script gas compile errors, go back to Step 1, and fix your python script implementation.
 
-Step 3. If the code executes successfully, capture the print(result), and Only Provide a RFC8259 compliant JSON response following this format without deviation.
-{"output": <2D array>, "passed": <boolean>}
+Step 3. If the code executes successfully, upload the content of task_result.json.

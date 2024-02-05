@@ -1,29 +1,17 @@
 You are an expert puzzle solver. You love to solve puzzles using reasons and logic in a step my step manner.
 You are given a series of inputs and output pairs.
-These are all in the form of a 2D array, representing a 2D grid, with values from 0-9.
-The input output pairs will come in a JSON in the following format:
-{"train": [{"input": <2d array>, "output": <2d array}, ..., {"input": <array>, "output": <2d array}], "test": [{"input": <2d array>, "output": <2d array}, ..., {"input": <array>, "output": <2d array}]}
-The values are not representative of any ordinal ranking.
-Input/output pairs may not reflect all possibilities, you are to infer the simplest possible relation making use of symmetry and invariance as much as possible.
-Do the following:
-Step 1. What is the general description of the input/output relation that holds true for all input/output pairs in "train" section of the json?
-        - Describe the relationship between the input and output image sizes 
-        - Describe the relationship between the input and output pixels, focusing on movement or pattern changes 
-Step 2. Based on the description above, what is the step by step instruction to transform the input to the output for each input-output pair in "train" section of the json?
-Step 3. Apply this instruction to all of the input-output pairs in the "train" section, to verify that your instruction works.
-        - For each pair, apply your instruction step by step, and communicate clearly how each pixels are derived in the output based on the input. 
-        - After getting the output for the pair, print the predicted output and the true output side by side, and check if they are the same.
-        - If so, proceed to next step
-        - If it fails for one of the pairs, go back to Step 2 to redesign your instructions.
-Step 4. Apply this instruction step by step to the "input" of "test" section of the task json and find out the answer 2d grid array in place of ’to_be_filled’. Please print out the 2d array.
-Step 5: check if the answer to 'to_be_filled' is:
-        - a 2D array representing a 2D grid
-        - with VALUES FROM 0-9 ONLY
-        - each subarray in the in the 2D array has to have the same length
-        if any of the above 3 points are false, Go back to Step 2.
-
-Provide a RFC8259 compliant JSON response following this format without deviation.
+The values from ’a’ to ’j’ represent different colors. ’.’ is a blank cell.
+For example, [[’.’,’a’,’.’],[’.’,’.’,’b’]] represents a 2 row x 3 col grid with color a at position (1,0) and color b at position (2,1).
+Coordinates are 2D positions (row, col), row representing row number, col representing col number, with zero-indexing.
+Input/output pairs may not reflect all possibilities, you are to infer the simplest possible relation.
+You are to output the following in  RFC8259 compliant JSON response without deviation.
 {
-  "general_description": <result from Step 1.>
-  "detailed_description": <result from Step 2.>
+  ’reflection’: ’reflect on the answer’,
+  ’pixel_changes’: ’describe the changes between the input and output pixels, focusing on movement or pattern changes’,
+  ’object_changes’: ’describe the changes between the input and output objects, focusing on movement, object number, size, shape, position, value, cell count’,
+  ’overall_pattern’: ’describe the simplest input-output relationship for all input-output pairs’,
+  ’program_instructions’: ’Plan how to write the python function and what helper functions and conditions to use’,
 }
+
+Do not use quotation marks ’ or " within the fields unless it is required for the python code
+

@@ -6,16 +6,12 @@ import os
 import copy
 import csv
 import time
-from typing import List
-from pydantic import BaseModel, Field
 
 # abstraction class to facilitate message array management and prompt loading
 class BaseOpenAIChatApp:
-    def __init__(self, sys_prompt_file, output_format_file):
+    def __init__(self, sys_prompt_file):
         with open(sys_prompt_file, 'r') as file:
             self.sys_prompt = file.read()
-        with open(output_format_file, 'r') as file:
-            self.output_format_prompt = file.read()
         self.num_tries = 3
         api_key = os.getenv('OPENAI_API_KEY')
         self.client = OpenAI(api_key=api_key)
@@ -27,33 +23,16 @@ class BaseOpenAIChatApp:
     # function to send a chat message and manage the conversation message queues
     def chat(self, user_prompt):
         self.messages.append({"role": "user", "content": user_prompt})
-        #print(self.messages)
         response = self.client.chat.completions.create(
-            model="gpt-4-32k",
+            model="gpt-4-0125-preview",
+            response_format={"type": "json_object"},
             messages=self.messages)
 
-        self.messages= [{"role": "assistant", "content": response.choices[0].message.content}]
-        return response
+        self.messages.append({"role": "assistant", "content": response.choices[0].message.content})
+        response_content = json.loads(response.choices[0].message.content)
+        return response_content
 
-    # extract the strict json object from the detailed answer given by GPT 
-    def strict_output(self):
-        complain = ""
-        for i in range(self.num_tries):
-            strict_json_prompt = complain + self.output_format_prompt
-            self.messages.append({"role": "user", "content": strict_json_prompt})
-            response = self.client.chat.completions.create(
-                model="gpt-4-0125-preview",
-                response_format={
-                    "type": "json_object", 
-                },
-                messages=self.messages)
-            try:
-                response_content = json.loads(response.choices[0].message.content)
-                return response_content
-            except json.JSONDecodeError:
-                print("{}th attempt at decoding for strict JSON output")
-                complain = "The JSON returned is not valid, please "
-  
+# this class uses the assistant API instead to take advantage of code interpreter
 class CodeTester(BaseOpenAIChatApp):
     # function to send a chat message and manage the conversation message queues
     def chat(self, user_prompt, file_name, assistant_timeout=600):
@@ -62,6 +41,9 @@ class CodeTester(BaseOpenAIChatApp):
             purpose='assistants'
         )
         self.messages = [{"role": "user", "content": user_prompt, "file_ids": [file.id]}]
+
+        # code to create your own assistant using the system prompt. Please comment out the next line
+        # that calls assistants.retrieve
         #assistant = self.client.beta.assistants.create(
         #    instructions=self.sys_prompt,
         #    model="gpt-4-0125-preview",
@@ -85,23 +67,18 @@ class CodeTester(BaseOpenAIChatApp):
             
             time.sleep(1)
             timeout = timeout + 1
-        
-        run_steps = self.client.beta.threads.runs.steps.list(
-            thread_id=thread.id,
-            run_id=run.id
-        )
 
-        for step_data in run_steps.data:
-            if step_data.status == "completed" and step_data.step_details.type == "tool_calls":
-                output = step_data.step_details.tool_calls[0].code_interpreter.outputs[0].logs
-                print("code_intepreter output")
-                print(output)
-                self.messages= [{"role": "assistant", "content": output}]
-                return output
+        print("Fetching task_json output")
+        file_list = self.client.files.list()
+        for fileobject in file_list.data:
+            if fileobject.filename == '/mnt/data/task_result.json':
+                task_file_content = self.client.files.retrieve_content(file_id=fileobject.id)
+                task_json = json.loads(task_file_content)
+                return task_json
 
 
-solver = BaseOpenAIChatApp(sys_prompt_file="sys_prompt.txt", output_format_file="output_format.txt")
-code_tester = CodeTester(sys_prompt_file="code_tester_sys_prompt.txt", output_format_file="code_output_format.txt")
+solver = BaseOpenAIChatApp(sys_prompt_file="sys_prompt.txt")
+code_tester = CodeTester(sys_prompt_file="code_tester_sys_prompt.txt")
 
 # helper function to convert grids from 2D array format to the submission format
 def flattener(pred):
@@ -112,23 +89,66 @@ def flattener(pred):
     str_pred = str_pred.replace(']]', '|')
     return str_pred
 
+# helper function to convert 2D int array to char grid view, suggested by the paper
+def convert_int_grid_to_char(array2d):
+    value_char_map = ['.', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+    char_array2d = []
+    for row in array2d:
+        char_row = [value_char_map[val] for val in row]
+        char_array2d.append(char_row)
+    return char_array2d
+
+# helper function to convert 2D char grid array to int grid view, suggested by the paper
+def convert_char_grid_to_int(array2d):
+    char_value_map = {'.': 0, 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9, 'j': 10}
+    int_array2d = []
+    for row in array2d:
+        int_row = [char_value_map[char] for char in row]
+        int_array2d.append(int_row)
+    return int_array2d
+
 # a function that feeds the ARCOpenAISolver the task information and the output id and
 # return the output
 def solve_arc_question(task_json, task_file_path, output_id):
     solver.reset()
     modified_task_json = copy.deepcopy(task_json)
-    modified_task_json["test"][output_id]["output"] = "'to_be_filled'"
-    user_prompt = "Here is a JSON of the input-output pairs\n{}".format(modified_task_json)
-    verbose_response = solver.chat(user_prompt=user_prompt)
-    print(verbose_response.choices[0].message.content)
-    response = solver.strict_output()
+    
+    for i in range(len(modified_task_json["train"])):
+        modified_task_json["train"][i]["input"] = convert_int_grid_to_char(modified_task_json["train"][i]["input"])
+        modified_task_json["train"][i]["output"] = convert_int_grid_to_char(modified_task_json["train"][i]["output"])
 
-    code_tester.reset()
-    code_tester_prompt = "The task json is attached.\n The output_id is {}\nHere is the description of the relationship between input and output 2D grids:\n{}\n".format(output_id, response)
-    code_response = code_tester.chat(user_prompt=code_tester_prompt, file_name=task_file_path)
-    code_response = code_tester.strict_output()
-    print(code_response)
-    return code_response 
+    for i in range(len(modified_task_json["test"])):
+        modified_task_json["test"][i]["input"] = convert_int_grid_to_char(modified_task_json["test"][i]["input"])
+        del modified_task_json["test"][i]["output"] 
+
+    with open('/tmp/modified_task.json', 'w') as f:
+        json.dump(modified_task_json, f)
+    user_prompt = "Here is a JSON of the input-output pairs\n{}".format(modified_task_json)
+
+    retries = 3
+    solution = {}
+    # provide environment feedback from code tester to the solver agent to ask for correction
+    for i in range(retries):
+        solver_response = solver.chat(user_prompt=user_prompt)
+        print(solver_response)
+
+        code_tester.reset()
+        code_tester_prompt = "The task json is attached.\n The output_id is {}\nHere is the description of the relationship between input and output 2D grids:\n{}\n".format(output_id, solver_response)
+        code_response = code_tester.chat(user_prompt=code_tester_prompt, file_name='/tmp/modified_task.json')
+        solution["passed"] = True
+        for question in code_response["train"]:
+            solution["passed"] = question["passed"]
+        output = convert_char_grid_to_int(code_response["test"][output_id]["predicted_output"])
+        solution["output"] = output
+        print(solution)
+        if not solution["passed"]:
+            user_prompt = "Based on your description of the relationship between input-output pairs,"
+            user_prompt += "a python problem is implemented, and it fails to produce output predictions that match groundtruth for all input-outpu pairs in the train section."
+            user_prompt += "Here's the result:\n{}\nPlease try again".format(code_response)
+        else:
+            break
+
+    return solution 
         
 # helper function to plot and visualize the input/output pairs in train set
 def show_image_from_json(task_json, input, predicted, groundtruth):
@@ -157,13 +177,10 @@ def show_image_from_json(task_json, input, predicted, groundtruth):
         
     plt.show()
 
-
+# MAIN
 if __name__ == "__main__":
-    #folder = './traininig/'
-    #train_files = os.listdir(folder)
     folder = './evaluation/'
     task_files = os.listdir(folder)
-    retries = 3
 
     output_ids = []
     outputs = []
@@ -178,14 +195,13 @@ if __name__ == "__main__":
         for output_id, question in enumerate(task_data["test"]):
             print("solving for task {} output_id {}".format(task_id, output_id))
             output = [[0]]
-            for i in range(retries):
-                try:
-                    solution = solve_arc_question(task_data, task_file_path, output_id)
-                    if solution["passed"]:
-                        output = solution["output"]
-                        break
-                except Exception as err:
-                    print("Error encountered during answering for task {}, error: {}".format(task_id, err))
+            try:
+                solution = solve_arc_question(task_data, task_file_path, output_id)
+                output = solution["output"]
+                if solution["passed"]:
+                    break
+            except Exception as err:
+                print("Error encountered during answering for task {}, error: {}".format(task_id, err))
                 
             groundtruth = None
             if "output" in task_data["test"][output_id]:
@@ -195,8 +211,9 @@ if __name__ == "__main__":
             outputs.append(output)
             output_ids.append("{}_{}".format(task_id, output_id))
 
-            test_input = task_data["test"][output_id]["input"]
-            show_image_from_json(task_data, test_input, output, groundtruth)
+            # uncomment to view dataset visualization
+            #test_input = task_data["test"][output_id]["input"]
+            #show_image_from_json(task_data, test_input, output, groundtruth)
 
         # write out the submission.csv according to ARC requirement
         with open('submission.csv', 'w', newline='') as file:
