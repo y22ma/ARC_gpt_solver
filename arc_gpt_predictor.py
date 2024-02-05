@@ -12,7 +12,6 @@ class BaseOpenAIChatApp:
     def __init__(self, sys_prompt_file):
         with open(sys_prompt_file, 'r') as file:
             self.sys_prompt = file.read()
-        self.num_tries = 3
         api_key = os.getenv('OPENAI_API_KEY')
         self.client = OpenAI(api_key=api_key)
         self.reset()
@@ -24,7 +23,7 @@ class BaseOpenAIChatApp:
     def chat(self, user_prompt):
         self.messages.append({"role": "user", "content": user_prompt})
         response = self.client.chat.completions.create(
-            model="gpt-4-0125-preview",
+            model="gpt-4-turbo-preview",
             response_format={"type": "json_object"},
             messages=self.messages)
 
@@ -46,7 +45,7 @@ class CodeTester(BaseOpenAIChatApp):
         # that calls assistants.retrieve
         #assistant = self.client.beta.assistants.create(
         #    instructions=self.sys_prompt,
-        #    model="gpt-4-0125-preview",
+        #    model="gpt-4-turbo-preview",
         #    tools=[{"type": "code_interpreter"}],
         #)
         assistant = self.client.beta.assistants.retrieve(assistant_id="asst_qBOR5eFp7Wz5RRCgblO5QfwB")
@@ -110,7 +109,6 @@ def convert_char_grid_to_int(array2d):
 # a function that feeds the ARCOpenAISolver the task information and the output id and
 # return the output
 def solve_arc_question(task_json, task_file_path, output_id):
-    solver.reset()
     modified_task_json = copy.deepcopy(task_json)
     
     for i in range(len(modified_task_json["train"])):
@@ -119,16 +117,21 @@ def solve_arc_question(task_json, task_file_path, output_id):
 
     for i in range(len(modified_task_json["test"])):
         modified_task_json["test"][i]["input"] = convert_int_grid_to_char(modified_task_json["test"][i]["input"])
-        del modified_task_json["test"][i]["output"] 
+        if "output" in modified_task_json["test"][i]:
+            del modified_task_json["test"][i]["output"]
 
     with open('/tmp/modified_task.json', 'w') as f:
         json.dump(modified_task_json, f)
     user_prompt = "Here is a JSON of the input-output pairs\n{}".format(modified_task_json)
 
     retries = 3
+    retry_with_context = False
     solution = {}
+    solver.reset()
+
     # provide environment feedback from code tester to the solver agent to ask for correction
     for i in range(retries):
+        print("Solving for the {} time".format(i + 1))
         solver_response = solver.chat(user_prompt=user_prompt)
         print(solver_response)
 
@@ -145,6 +148,12 @@ def solve_arc_question(task_json, task_file_path, output_id):
             user_prompt = "Based on your description of the relationship between input-output pairs,"
             user_prompt += "a python problem is implemented, and it fails to produce output predictions that match groundtruth for all input-outpu pairs in the train section."
             user_prompt += "Here's the result:\n{}\nPlease try again".format(code_response)
+            if retry_with_context:
+                user_prompt = "Based on your description of the relationship between input-output pairs,"
+                user_prompt += "a python problem is implemented, and it fails to produce output predictions that match groundtruth for all input-outpu pairs in the train section."
+                user_prompt += "Here's the result:\n{}\nPlease try again".format(code_response)
+            else:
+                solver.reset()
         else:
             break
 
@@ -179,6 +188,8 @@ def show_image_from_json(task_json, input, predicted, groundtruth):
 
 # MAIN
 if __name__ == "__main__":
+    #folder = '/kaggle/input/abstraction-and-reasoning-challenge/test'
+    #task_files = os.listdir(folder)
     folder = './evaluation/'
     task_files = os.listdir(folder)
 

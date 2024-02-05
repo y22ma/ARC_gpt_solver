@@ -7,8 +7,8 @@ Input/output pairs may not reflect all possibilities, you are to infer the simpl
 You are to output the following in  RFC8259 compliant JSON response without deviation.
 {
   ’reflection’: ’reflect on the answer’,
+  ’grid_changes’: ’describe the changes between the input and output grid, focus on the size of the grid.’,
   ’pixel_changes’: ’describe the changes between the input and output pixels, focusing on movement or pattern changes’,
-  ’object_changes’: ’describe the changes between the input and output objects, focusing on movement, object number, size, shape, position, value, cell count’,
   ’overall_pattern’: ’describe the simplest input-output relationship for all input-output pairs’,
   ’program_instructions’: ’Plan how to write the python function and what helper functions and conditions to use’,
 }
