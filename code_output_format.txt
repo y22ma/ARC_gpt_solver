@@ -1,6 +1,0 @@
-Given a string of a JSON object, please output the JSON object. Do not provide any explanation. Only Provide a RFC8259 compliant JSON response following this format without deviation.
-
-{
-  "output": <replace by parsing the input string for the content of "output" 2D array>,
-  "passed": <replace by parsing the input string for the content of "passed" boolean>
-}

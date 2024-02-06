@@ -6,6 +6,8 @@ import os
 import copy
 import csv
 import time
+import traceback
+from io import StringIO
 from helper_functions import *
 
 # abstraction class to facilitate message array management and prompt loading
@@ -39,71 +41,37 @@ class BaseOpenAIChatApp:
         return response_content
 
 # this class uses the assistant API instead to take advantage of code interpreter
-class CodeTester(BaseOpenAIChatApp):
-    def __init__(self, sys_prompt_file):
-        super().__init__(sys_prompt_file)
-        # code to create your own assistant using the system prompt. Please comment out the next line
-        # that calls assistants.retrieve
+class CodeTester():
+    def test(self, python_code, task_data):
+        error_msg = None
+        try:
+            # test out if function compiles
+            local_scope = {}
+            print(python_code)
+            exec(python_code, globals())
+            # Retrieve the compiled function from the local scope
+            #transform_grid = local_scope['transform_grid']
+            for i, question in enumerate(task_data["train"]):
+                task_data["train"][i]["predicted_output"] = transform_grid(question["input"])
+                task_data["train"][i]["passed"] = task_data["train"][i]["predicted_output"] == question["output"]
+                if not task_data["train"][i]["passed"]:
+                    print("predicted {} vs truth {}".format(task_data["train"][i]["predicted_output"], question["output"]))
 
-        #helper_function_file = self.client.files.create(
-        #    file=open("helper_functions.py", "rb"),
-        #    purpose='assistants'
-        #)
-        #self.helper_function_fid = helper_function_file.id
-        #self.assistant = self.client.beta.assistants.create(
-        #    instructions=self.sys_prompt,
-        #    model="gpt-4-turbo-preview",
-        #    tools=[{"type": "code_interpreter"}],
-        #    file_ids=[helper_function_file.id]
-        #)
-        self.assistant = self.client.beta.assistants.retrieve(
-            assistant_id="asst_wms9TS1vJ4QP1o4dp9ZtJ9id")
-        self.helper_function_fid = "asst_qBOR5eFp7Wz5RRCgblO5QfwB"
+            for i, question in enumerate(task_data["test"]):
+                task_data["test"][i]["predicted_output"] = transform_grid(question["input"])
 
-    # function to send a chat message and manage the conversation message queues
-    def chat(self, user_prompt, file_name, assistant_timeout=600):
-        file = self.client.files.create(
-            file=open(file_name, "rb"),
-            purpose='assistants'
-        )
-        user_prompt += "\nPlease see file with ID {} for the task JSON file".format(file.id)
-        #user_prompt += "\nPlease see file with ID {} for the helper_functions.py, you can refer to it when building your transform function".format(self.helper_function_fid)
-        user_prompt += "\nPLEASE NAME THE OUTPUT FILE task_result.json"
-        self.messages = [{"role": "user", "content": user_prompt, "file_ids": [file.id]}]
-        print(user_prompt)
-
-        thread = self.client.beta.threads.create(
-            messages=self.messages
-        )
-        run = self.client.beta.threads.runs.create(
-          thread_id=thread.id,
-          assistant_id=self.assistant.id
-        )
-
-        timeout = 0
-        print("Awaiting on Assistant thread to finish")
-        while timeout < assistant_timeout:
-            run = self.client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-            if run.status == "completed":
-                break
-            
-            time.sleep(1)
-            timeout = timeout + 1
-        self.client.files.delete(file_id=file.id)
-
-        print("Fetching task_json output")
-        file_list = self.client.files.list()
-        for fileobject in file_list.data:
-            print(fileobject)
-            if fileobject.filename == '/mnt/data/task_result.json':
-                task_file_content = self.client.files.retrieve_content(file_id=fileobject.id)
-                task_json = json.loads(task_file_content)
-                self.client.files.delete(file_id=fileobject.id)
-                return task_json
-
+            return task_data
+        except Exception as e:
+            exception_traceback = StringIO()
+            traceback.print_exc(file=exception_traceback)
+            error_msg = exception_traceback.getvalue()
+            print('Code did not work')
+            print(error_msg)
+        
+        return {"error_message": error_msg}
 
 solver = BaseOpenAIChatApp(sys_prompt_file="sys_prompt.txt")
-code_tester = CodeTester(sys_prompt_file="code_tester_sys_prompt.txt")
+code_tester = CodeTester()
 
 # helper function to convert grids from 2D array format to the submission format
 def flattener(pred):
@@ -158,41 +126,41 @@ def solve_arc_question(task_json, task_file_path, output_id):
         if "output" in modified_task_json["test"][i]:
             del modified_task_json["test"][i]["output"]
 
-    with open('/tmp/modified_task.json', 'w') as f:
-        json.dump(modified_task_json, f)
     user_prompt = "Here is a JSON of the input-output pairs\n{}".format(modified_task_json)
-    print(user_prompt)
 
-    retries = 3
-    retry_with_context = False
-    solution = {}
+    retries = 5
+    solution = {"passed": False, "output": [[0]]}
     solver.reset()
 
     # provide environment feedback from code tester to the solver agent to ask for correction
     for i in range(retries):
         print("Solving for the {} time".format(i + 1))
         solver_response = solver.chat(user_prompt=user_prompt)
+        print(solver_response)
 
-        code_tester.reset()
-        code_tester_prompt = "Here is the description of the relationship between input and output 2D grids:\n{}\n".format(solver_response)
-        code_response = code_tester.chat(user_prompt=code_tester_prompt, file_name='/tmp/modified_task.json')
-        if code_response is None:
-            solution["passed"] = false
-            solution["output"] = [[0]]
-        else:
-            solution["passed"] = True
-            for question in code_response["train"]:
-                solution["passed"] = question["passed"]
-            output = convert_char_grid_to_int(code_response["test"][output_id]["predicted_output"])
-            solution["output"] = output
-        print(solution)
+        task_json_buf = copy.deepcopy(modified_task_json)
+        result = code_tester.test(python_code=solver_response["python_program"], task_data=task_json_buf)
+        if "error_message" in result:
+            user_prompt += '\nPrevious Program:\n'+ solver_response["python_program"]
+            user_prompt += '\nError message:\n' + result["error_message"]
+            user_prompt += f'\nPrevious overall pattern: {solver_response["overall_pattern"]}.\n\nYour code had compilation errors. Correct it.'
+            continue
+
+        solution["passed"] = True
+        for question in task_json_buf["train"]:
+            solution["passed"] = question["passed"]
+        output = convert_char_grid_to_int(result["test"][output_id]["predicted_output"])
+        solution["output"] = output
+        solution["solver_response"] = solver_response
+        solution["python_program"] = solver_response["python_program"]
+
         if not solution["passed"]:
-            if retry_with_context:
-                user_prompt = "Based on your description of the relationship between input-output pairs,"
-                user_prompt += "a python problem is implemented, and it fails to produce output predictions that match groundtruth for all input-outpu pairs in the train section."
-                user_prompt += "Here's the result:\n{}\nPlease try again".format(code_response)
-            else:
-                solver.reset()
+            user_prompt = "The program you provided fails to produce output predictions that match groundtruth for all input-output pairs in the train section."
+            user_prompt += "Check the predicted_output vs the output entries in the JSON."
+            user_prompt += '\nPrevious Program:\n'+ solver_response["python_program"]
+            user_prompt += f'\nPrevious overall pattern: {solver_response["overall_pattern"]}.\n'
+            user_prompt += f'\nJSON containing predicted output:\n{result}.\n'
+            user_prompt += 'Please rethink your strategy.'
         else:
             break
 
@@ -231,6 +199,7 @@ if __name__ == "__main__":
     #task_files = os.listdir(folder)
     folder = './evaluation/'
     task_files = os.listdir(folder)
+    success_count = 0
 
     output_ids = []
     outputs = []
@@ -248,23 +217,35 @@ if __name__ == "__main__":
             try:
                 solution = solve_arc_question(task_data, task_file_path, output_id)
                 output = solution["output"]
-                if solution["passed"]:
-                    break
             except Exception as err:
                 print("Error encountered during answering for task {}, error: {}".format(task_id, err))
-                raise
+                #raise
                 
             groundtruth = None
             if "output" in task_data["test"][output_id]:
                 groundtruth = task_data["test"][output_id]["output"]
+                task_success = flattener(output) == flattener(groundtruth)
                 print("predicted {} vs groundtruth {}".format(flattener(output), flattener(groundtruth)))
-                print("Pass? {}".format(flattener(output) == flattener(groundtruth)))
+                print("Pass? {}".format(task_success))
+
+                if not os.path.exists('results'):
+                    os.makedirs('results')
+                    
+                if task_success:
+                    solution_filename = os.path.join("results", f"{task_id}_solution.json")
+                    with open(solution_filename, 'w') as solution_file:
+                        json.dump({'solution': solution}, solution_file)
+                    success_count = success_count + 1
+                    
+
             outputs.append(output)
             output_ids.append("{}_{}".format(task_id, output_id))
+            print("Success count {}/{}", success_count, len(task_files))
 
             # uncomment to view dataset visualization
-            test_input = task_data["test"][output_id]["input"]
-            show_image_from_json(task_data, test_input, output, groundtruth)
+            #test_input = task_data["test"][output_id]["input"]
+            #show_image_from_json(task_data, test_input, output, groundtruth)
+            
 
         # write out the submission.csv according to ARC requirement
         with open('submission.csv', 'w', newline='') as file:

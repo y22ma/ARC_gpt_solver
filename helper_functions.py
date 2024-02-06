@@ -36,8 +36,7 @@ def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, mu
                 if more_info:
                     obj_dict['size'] = (len(grid), len(grid[0]))
                     obj_dict['cell_count'] = len(obj)
-                    obj_dict['shape'] = (max(x for x, _ in obj)-i+1, max(y for _, y in obj)-j+1)
-                    object_dict['shape'] = [['x' if cell != '.' else '.' for cell in row] for row in object_dict['grid']]
+                    obj_dict['shape'] = [['x' if cell != '.' else '.' for cell in row] for row in obj_dict['grid']]
 
                 objects.append(obj_dict)
 
@@ -54,8 +53,7 @@ def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, mu
                 if more_info:
                     obj_dict['size'] = (len(grid), len(grid[0]))
                     obj_dict['cell_count'] = len(obj)
-                    obj_dict['shape'] = (max(x for x, _ in obj)-i+1, max(y for _, y in obj)-j+1)
-                    object_dict['shape'] = [['x' if cell != '.' else '.' for cell in row] for row in object_dict['grid']]
+                    obj_dict['shape'] = [['x' if cell != '.' else '.' for cell in row] for row in obj_dict['grid']]
 
                 objects.append(obj_dict)
 
@@ -280,8 +278,8 @@ def fill_rect(grid, tl, br, value):
 # fill_value(grid, pos, value): fills grid at position with value
 def fill_value(grid, pos, value):
     # Check if pos is within the grid
-    if pos[0] < 0 or pos[0] >= len(grid) or pos[1] < 0 or pos[1] >= len(grid[0]):
-        raise ValueError("pos is out of grid bounds")
+    if pos[0] < 0 or pos[1] >= len(grid) or pos[0] < 0 or pos[0] >= len(grid[0]):
+        raise ValueError("pos {} is out of grid bounds".format(pos))
 
     # Fill the grid at pos with value
     grid[pos[0]][pos[1]] = value

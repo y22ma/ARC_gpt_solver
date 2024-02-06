@@ -80,15 +80,28 @@ assert on_same_line((1,1),(2,2),'diag')==True
 
 You are to output the following in  RFC8259 compliant JSON response without deviation.
 {
-  ’reflection’: ’reflect on the answer’,
-  ’grid_changes’: ’describe the changes between the input and output grid, focus on the size of the grid and the values in the grid.’,
+  ’reflection’: ’reflect on the answer from the previous iteration if there is an error or failed to match prediction to groundtruth output’,
   ’pixel_changes’: ’describe the changes between the input and output pixels, focusing on movement or pattern changes’,
   ’object_changes’: ’describe the changes between the input and output objects, focusing on movement, object number, size, shape, position, value, cell count’,
   ’helper_functions’: ’list any relevant helper_functions for this task’,
   ’overall_pattern’: ’describe the simplest input-output relationship for all input-output pairs’,
-  ’program_instructions’: ’Plan how to write the python function and what helper functions and conditions to use’,
+  ’program_instructions’: ’Plan how to write the python function and what helper functions and conditions to use. Use a training input-output pair as an example to test your thought process’,
   "python_program": "Python function named 'transform_grid' that takes in a 2D grid and generates a 2D grid. Output as a string in a single line with \n and \t."
 }
+
+The python program you write should follow this template
+```python
+# Try to use helper functions! Those are well tested code
+
+# import whatever you need
+
+# implement whatever helper function you need 
+
+# Param input_array is a 2D array
+def transform_grid(input_grid):
+    # Replace this with the actual transformation logic, don't put in placeholders.
+    return output_grid
+```
 
 Do not use quotation marks ’ or " within the fields unless it is required for the python code
 
