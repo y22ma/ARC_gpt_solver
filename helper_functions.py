@@ -35,7 +35,7 @@ def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, mu
                 obj_dict = {'tl': (i, j), 'grid': obj_grid}
                 if more_info:
                     obj_dict['size'] = (len(grid), len(grid[0]))
-                    obj_dict['cell_count'] = len(obj)
+                    obj_dict['cell_count'] = sum(cell != '.' for row in grid for cell in row)
                     obj_dict['shape'] = [['x' if cell != '.' else '.' for cell in row] for row in obj_dict['grid']]
 
                 objects.append(obj_dict)
@@ -52,7 +52,7 @@ def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, mu
                 obj_dict = {'tl': (i, j), 'grid': obj_grid}
                 if more_info:
                     obj_dict['size'] = (len(grid), len(grid[0]))
-                    obj_dict['cell_count'] = len(obj)
+                    obj_dict['cell_count'] = sum(cell != '.' for row in grid for cell in row)
                     obj_dict['shape'] = [['x' if cell != '.' else '.' for cell in row] for row in obj_dict['grid']]
 
                 objects.append(obj_dict)
@@ -86,33 +86,45 @@ def crop_grid(grid, tl, br):
 def tight_fit(grid):
     # Remove empty rows
     grid = [row for row in grid if any(cell != '.' for cell in row)]
-    
+
     # Transpose the grid for column operations
     grid_t = list(map(list, zip(*grid)))
-    
+
     # Remove empty columns
     grid_t = [col for col in grid_t if any(cell != '.' for cell in col)]
-    
+
     # Transpose back to original orientation
     grid = list(map(list, zip(*grid_t)))
-    
+
     return grid
 
 # combine_object(obj_1, obj_2): returns combined object from obj_1 and obj_2. if overlap, obj_2 overwrites obj_1
 def combine_object(obj_1, obj_2):
     # Copy the grid of obj_1 to avoid modifying the original object
     combined_grid = [row.copy() for row in obj_1['grid']]
-    
+
     # Calculate the relative position of obj_2 to obj_1
     relative_pos = (obj_2['tl'][0] - obj_1['tl'][0], obj_2['tl'][1] - obj_1['tl'][1])
-    
+
     # Overwrite the cells in combined_grid with the cells of obj_2
     for i, row in enumerate(obj_2['grid']):
         for j, cell in enumerate(row):
             combined_grid[i + relative_pos[0]][j + relative_pos[1]] = cell
-    
+
     # Return the combined object
-    return {'tl': obj_1['tl'], 'grid': combined_grid}
+    # Compute additional fields if they exist in the input objects
+    additional_fields = {}
+    if 'size' in obj_1 or 'size' in obj_2:
+        additional_fields['size'] = (len(combined_grid), len(combined_grid[0]))
+    if 'cell_count' in obj_1 or 'cell_count' in obj_2:
+        additional_fields['cell_count'] = sum(cell != '.' for row in combined_grid for cell in row)
+    if 'shape' in obj_1 or 'shape' in obj_2:
+        additional_fields['shape'] = [len(row) for row in combined_grid if any(cell != '.' for cell in row)]
+
+    # Combine the base object with any additional fields
+    combined_object = {'tl': obj_1['tl'], 'grid': combined_grid}
+    combined_object.update(additional_fields)
+    return combine_object
 
 # rotate_clockwise(grid, degree=90): returns rotated grid clockwise by a degree of 90, 180, 270 degrees
 def rotate_clockwise(grid, degree=90):
@@ -161,8 +173,19 @@ def change_object_color(obj, value):
     # Create a new grid with the new color
     new_grid = [[value if cell != '.' else '.' for cell in row] for row in obj['grid']]
 
-    # Create a new object with the new color
+    # Return the combined object
+    # Compute additional fields if they exist in the input objects
+    additional_fields = {}
+    if 'size' in obj:
+        additional_fields['size'] = obj["size"]
+    if 'cell_count' in obj:
+        additional_fields['cell_count'] = sum(cell != '.' for row in new_grid for cell in row)
+    if 'shape' in obj:
+        additional_fields['shape'] = [len(row) for row in new_grid if any(cell != '.' for cell in row)]
+
+    # Combine the base object with any additional fields
     new_obj = {'tl': obj['tl'], 'grid': new_grid}
+    new_obj.update(additional_fields)
 
     return new_obj
 
