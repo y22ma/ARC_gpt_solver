@@ -67,7 +67,7 @@ class CodeTester():
             error_msg = exception_traceback.getvalue()
             print('Code did not work')
             print(error_msg)
-        
+
         return {"error_message": error_msg}
 
 solver = BaseOpenAIChatApp(sys_prompt_file="sys_prompt.txt")
@@ -107,7 +107,7 @@ def get_grid_size(array2d):
 # return the output
 def solve_arc_question(task_json, task_file_path, output_id):
     modified_task_json = copy.deepcopy(task_json)
-    
+
     for i in range(len(modified_task_json["train"])):
         modified_task_json["train"][i]["input"] = convert_int_grid_to_char(modified_task_json["train"][i]["input"])
         modified_task_json["train"][i]["input_grid_size"] = get_grid_size(modified_task_json["train"][i]["input"])
@@ -164,8 +164,8 @@ def solve_arc_question(task_json, task_file_path, output_id):
         else:
             break
 
-    return solution 
-        
+    return solution
+
 # helper function to plot and visualize the input/output pairs in train set
 def show_image_from_json(task_json, input, predicted, groundtruth):
     train_data = task_json['train']
@@ -178,7 +178,7 @@ def show_image_from_json(task_json, input, predicted, groundtruth):
         axs[i, 0].set_title('Input Image')
         axs[i, 1].imshow(output_image, cmap='viridis')
         axs[i, 1].set_title('Output Image')
-    
+
     input_image = np.array(input)
     predicted_image = np.array(predicted)
     axs[-2, 0].set_title('Test Input')
@@ -190,7 +190,7 @@ def show_image_from_json(task_json, input, predicted, groundtruth):
       groundtruth_image = np.array(groundtruth)
       axs[-1, 0].set_title('Groundtruth')
       axs[-1, 0].imshow(groundtruth_image, cmap='viridis')
-        
+
     plt.show()
 
 # MAIN
@@ -200,14 +200,25 @@ if __name__ == "__main__":
     folder = './evaluation/'
     task_files = os.listdir(folder)
     success_count = 0
+    attempt_count = 0
+    result_folder = "results"
+    if not os.path.exists(result_folder):
+        os.makedirs(result_folder)
 
     output_ids = []
     outputs = []
     for json_file in task_files:
+        attempt_count = attempt_count + 1
         task_file_path = os.path.join(folder, json_file)
         with open(task_file_path, 'r') as f:
             task_data = json.load(f)
             task_id = json_file.split('.')[0]
+
+        solution_filename = os.path.join(result_folder, f"{task_id}_solution.json")
+        if os.path.exists(solution_filename):
+            success_count = success_count + 1
+            print("Success count {}/{}".format(success_count, attempt_count))
+            continue
 
         # for each question within each task, append a flattened output
         # with the corresponding {task_id}_{output_id}
@@ -220,7 +231,7 @@ if __name__ == "__main__":
             except Exception as err:
                 print("Error encountered during answering for task {}, error: {}".format(task_id, err))
                 #raise
-                
+
             groundtruth = None
             if "output" in task_data["test"][output_id]:
                 groundtruth = task_data["test"][output_id]["output"]
@@ -228,24 +239,19 @@ if __name__ == "__main__":
                 print("predicted {} vs groundtruth {}".format(flattener(output), flattener(groundtruth)))
                 print("Pass? {}".format(task_success))
 
-                if not os.path.exists('results'):
-                    os.makedirs('results')
-                    
                 if task_success:
-                    solution_filename = os.path.join("results", f"{task_id}_solution.json")
                     with open(solution_filename, 'w') as solution_file:
                         json.dump({'solution': solution}, solution_file)
                     success_count = success_count + 1
-                    
 
             outputs.append(output)
             output_ids.append("{}_{}".format(task_id, output_id))
-            print("Success count {}/{}", success_count, len(task_files))
+            print("Success count {}/{}".format(success_count, len(task_files)))
 
             # uncomment to view dataset visualization
             #test_input = task_data["test"][output_id]["input"]
             #show_image_from_json(task_data, test_input, output, groundtruth)
-            
+
 
         # write out the submission.csv according to ARC requirement
         with open('submission.csv', 'w', newline='') as file:

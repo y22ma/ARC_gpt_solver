@@ -1,6 +1,7 @@
 training/
 test/
 evaluation/
+results/
 abstraction-and-reasoning-challenge.zip
 submission.csv
 sample_submission.csv
