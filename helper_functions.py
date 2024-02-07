@@ -1,11 +1,11 @@
 import numpy as np
 
-# get_objects(grid,diag=False,by_row=False,by_col=False,by_color=False,multicolor=False,more_info = True):
+# get_objects(grid,diag=False,by_row=False,by_col=False,by_color=False,multi_color=False,more_info = True):
 #   Takes in grid, returns list of object dictionary: top-left coordinate of object (’tl’), 2D grid (’grid’) by_row views splits objects
-#   by grid rows, by_col splits objects by grid columns, by_color groups each color as one object, multicolor means object
-#   can be more than one color. Empty cells within objects are represented as ’$’. If more_info is True, also returns size of
+#   by grid rows, by_col splits objects by grid columns, by_color groups each color as one object, multi_color means object
+#   can be more than one color. Empty cells within objects are represented as ’.’. If more_info is True, also returns size of
 #   grid (’size’), cells in object (’cell_count’), shape of object (’shape’)
-def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, multicolor=False, more_info=True):
+def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, multi_color=False, more_info=True):
     objects = []
     visited = [[False]*len(grid[0]) for _ in range(len(grid))]
 
@@ -48,7 +48,7 @@ def get_objects(grid, diag=False, by_row=False, by_col=False, by_color=False, mu
                 row_bounds = (min(x for x, _ in obj), max(x for x, _ in obj))
                 col_bounds = (min(y for _, y in obj), max(y for _, y in obj))
                 obj_grid = [row[col_bounds[0]:col_bounds[1]+1] for row in grid[row_bounds[0]:row_bounds[1]+1]]
-                obj_grid = [['$' for _ in range(col_bounds[1]-col_bounds[0]+1)] for _ in range(row_bounds[1]-row_bounds[0]+1)]
+                obj_grid = [['.' for _ in range(col_bounds[1]-col_bounds[0]+1)] for _ in range(row_bounds[1]-row_bounds[0]+1)]
                 obj_dict = {'tl': (i, j), 'grid': obj_grid}
                 if more_info:
                     obj_dict['size'] = (len(grid), len(grid[0]))
