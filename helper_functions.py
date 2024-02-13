@@ -72,10 +72,10 @@ def get_pixel_coords(array2d):
             pixel_view[char].append((row_index, col_index))
     return pixel_view
 
-# empty_grid(row, col): returns an empty grid of height row and width col
-def empty_grid(row, col):
+# empty_grid(row, col, value): returns an empty grid of height row and width col filled with value
+def empty_grid(row, col, value='.'):
     # No code needs to be inserted as the function is already implemented correctly
-    return [['.' for _ in range(col)] for _ in range(row)]
+    return [[value for _ in range(col)] for _ in range(row)]
 
 # crop_grid(grid, tl, br): returns cropped section from top left to bottom right of the grid
 def crop_grid(grid, tl, br):

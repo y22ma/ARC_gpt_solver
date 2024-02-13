@@ -3,6 +3,7 @@ from helper_functions import *
 assert get_objects([['a','a','a'],['a','.','a'],['a','a','a']],more_info=False)==[{'tl':(0, 0),'grid':[['a','a','a'],['a','.','a'],['a','a','a']]},{'tl':(1,1),'grid':[['$']]}]
 assert get_pixel_coords([['a','a'],['d','f']])=={'a':[(0, 0),(0, 1)],'d':[(1, 0)],'f':[(1, 1)]}
 assert empty_grid(3, 2)==[['.','.'], ['.','.'], ['.','.']]
+assert empty_grid(3, 2, value='a')==[['a','a'], ['a','a'], ['a','a']]
 assert crop_grid([['a','a','b'],['.','a','b']],(0, 0),(1, 1))==[['a','a'],['.','a']]
 assert tight_fit([['.','.','.'],['.','a','.'],['.','.','.']])==[['a']]
 assert combine_object({'tl':(0, 0),'grid':[['a','a'],['a','.']]},{'tl': (1, 1),'grid':[['f']]})=={'tl':(0, 0),'grid':[['a','a'],['a','f']]}

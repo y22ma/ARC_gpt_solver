@@ -18,46 +18,20 @@ class BaseOpenAIChatApp:
         api_key = os.getenv('OPENAI_API_KEY')
         self.client = OpenAI(api_key=api_key)
         self.reset()
-        self.reasoning_modules = [
-            "1. How could I devise an experiment to help solve that problem?",
-            "2. Make a list of ideas for solving this problem, and apply them one by one to the problem to see if any progress can be made.",
-            #"3. How could I measure progress on this problem?",
-            "4. How can I simplify the problem so that it is easier to solve?",
-            "5. What are the key assumptions underlying this problem?",
-            "6. What are the potential risks and drawbacks of each solution?",
-            "7. What are the alternative perspectives or viewpoints on this problem?",
-            "8. What are the long-term implications of this problem and its solutions?",
-            "9. How can I break down this problem into smaller, more manageable parts?",
-            "10. Critical Thinking: This style involves analyzing the problem from different perspectives, questioning assumptions, and evaluating the evidence or information available. It focuses on logical reasoning, evidence-based decision-making, and identifying potential biases or flaws in thinking.",
-            "11. Try creative thinking, generate innovative and out-of-the-box ideas to solve the problem. Explore unconventional solutions, thinking beyond traditional boundaries, and encouraging imagination and originality.",
-            #"12. Seek input and collaboration from others to solve the problem. Emphasize teamwork, open communication, and leveraging the diverse perspectives and expertise of a group to come up with effective solutions.",
-            "13. Use systems thinking: Consider the problem as part of a larger system and understanding the interconnectedness of various elements. Focuses on identifying the underlying causes, feedback loops, and interdependencies that influence the problem, and developing holistic solutions that address the system as a whole.",
-            "14. Use Risk Analysis: Evaluate potential risks, uncertainties, and tradeoffs associated with different solutions or approaches to a problem. Emphasize assessing the potential consequences and likelihood of success or failure, and making informed decisions based on a balanced analysis of risks and benefits.",
-            #"15. Use Reflective Thinking: Step back from the problem, take the time for introspection and self-reflection. Examine personal biases, assumptions, and mental models that may influence problem-solving, and being open to learning from past experiences to improve future approaches.",
-            "16. What is the core issue or problem that needs to be addressed?",
-            "17. What are the underlying causes or factors contributing to the problem?",
-            "18. Are there any potential solutions or strategies that have been tried before? If yes, what were the outcomes and lessons learned?",
-            "19. What are the potential obstacles or challenges that might arise in solving this problem?",
-            "20. Are there any relevant data or information that can provide insights into the problem? If yes, what data sources are available, and how can they be analyzed?",
-            "21. Are there any stakeholders or individuals who are directly affected by the problem? What are their perspectives and needs?",
-            "22. What resources (financial, human, technological, etc.) are needed to tackle the problem effectively?",
-            "23. How can progress or success in solving the problem be measured or evaluated?",
-            "24. What indicators or metrics can be used?",
-            "25. Is the problem a technical or practical one that requires a specific expertise or skill set? Or is it more of a conceptual or theoretical problem?",
-            "26. Does the problem involve a physical constraint, such as limited resources, infrastructure, or space?",
-            "27. Is the problem related to human behavior, such as a social, cultural, or psychological issue?",
-            "28. Does the problem involve decision-making or planning, where choices need to be made under uncertainty or with competing objectives?",
-            "29. Is the problem an analytical one that requires data analysis, modeling, or optimization techniques?",
-            "30. Is the problem a design challenge that requires creative solutions and innovation?",
-            "31. Does the problem require addressing systemic or structural issues rather than just individual instances?",
-            "32. Is the problem time-sensitive or urgent, requiring immediate attention and action?",
-            "33. What kinds of solution typically are produced for this kind of problem specification?",
-            "34. Given the problem specification and the current best solution, have a guess about other possible solutions."
-            "35. Let’s imagine the current best solution is totally wrong, what other ways are there to think about the problem specification?"
-            "36. What is the best way to modify this current best solution, given what you know about these kinds of problem specification?"
-            "37. Ignoring the current best solution, create an entirely new solution to the problem."
-            #"38. Let’s think step by step."
-            "39. Let’s make a step by step plan and implement it with good notation and explanation."
+        self.problem_types = [
+            "Image reduction: input is a larger image, and patches of the image is aggregated (max reduction, min reduction, etc) and the output is recorded in the corresponding spot in the output",
+            "Pixel value change: input image and output image has the same occupancy shape in the grid, but pixels with some values are changed to another value",
+            "Pixel position: changing the position of some pixels. For examples, move all pixels of a certain color to row=0 or col=0",
+            "Object change: transformations where one or more objects are translated, reflected, or rotated based on some conditions, or color changes based on some conditions",
+            "Object counting: count object with the same shape, and output the grid of the object with a highest quantities",
+            "Moving object: move objects by selecting an anchor and moving it to another location",
+            "Reflecting the image: reflect some part of the image to create a larger image",
+            "Rotate the image: rotate some part of the image by different degree amounts and tile them to create a larger image",
+            "Copy the image: copy some part of the image as a tile to create a larger image",
+            "Creating lines: create lines from an anchor or by connecting two coordinates",
+            "Creating a border around the image with some color value",
+            "Creating a border around the object with some color value",
+            "Inpaint: filled in image content that's masked out by a value, using information from other parts of the image (symmetry from a reflection)",
         ]
 
 
@@ -69,13 +43,13 @@ class BaseOpenAIChatApp:
 
     def reset(self):
         self.messages = [{"role": "system", "content": self.sys_prompt}]
-        #self.messages = []
 
     # function to send a chat message and manage the conversation message queues
     def chat(self, user_prompt):
         self.messages.append({"role": "user", "content": user_prompt})
         response = self.client.chat.completions.create(
             model="gpt-4-turbo-preview",
+            temperature=0.7,
             response_format={"type": "json_object"},
             messages=self.messages)
 
@@ -84,7 +58,6 @@ class BaseOpenAIChatApp:
         response_content = json.loads(response.choices[0].message.content)
         return response_content
 
-# this class uses the assistant API instead to take advantage of code interpreter
 class CodeTester():
     def test(self, python_code, task_data):
         error_msg = None
@@ -148,7 +121,7 @@ def get_grid_size(array2d):
 
 # a function that feeds the ARCOpenAISolver the task information and the output id and
 # return the output
-def solve_arc_question(task_json, task_file_path, output_id):
+def solve_arc_question(task_json):
     modified_task_json = copy.deepcopy(task_json)
 
     for i in range(len(modified_task_json["train"])):
@@ -171,22 +144,32 @@ def solve_arc_question(task_json, task_file_path, output_id):
 
     # SELECT step of Self Discovery
     task_description = "Your task is to find the transform between the input-output pairs in the 'train' section in this JSON:\n{}".format(modified_task_json) 
-    user_prompt = "\n{}\nWhich of the following modules are relevant? Do elborate why\n\n{}\n".format(task_description, solver.reasoning_modules)
-    user_prompt += '\nPlease respond in this JSON format: {"selected_modules": ["module_1", "module_2", ...]}'
-    selected_modules = solver.chat(user_prompt=user_prompt)
-    print(selected_modules)
+    user_prompt = "\n{}\nDescribe the relationships between the input_grid_size and the output_grid_size each of the input-output pair in the 'train' section in this JSON".format(task_description)
+    user_prompt += '\nPlease respond in this JSON format: {"grid_size_observation": ["grid_size changes for pair1", "grid_size_changes for pair2", ...]}'
+    grid_size_obs = solver.chat(user_prompt=user_prompt)
+    print(grid_size_obs)
 
     # ADAPT step of Self Discovery
-    user_prompt = "Without working out the full solution, adapt the following reasoning modules to be specific to our task:\n{}\n\n{}".format(selected_modules, task_description)
-    user_prompt += '\nPlease respond in this JSON format: {"adapted_modules": ["adapted module_1", "adapted module_2", ...]}'
-    adapted_modules = solver.chat(user_prompt=user_prompt)
-    print(adapted_modules)
+    user_prompt = "\n{}\nDescribe the relashionships between input_objects and output_objects".format(task_description)
+    user_prompt += '\nPlease respond in this JSON format: {"object_observations": ["object changes for pair1", "object changes for pair2", ...]}'
+    obj_obs = solver.chat(user_prompt=user_prompt)
+    print(obj_obs)
 
-    # IMPLEMENT
-    user_prompt = "Without working out the full solution, create an actionable reasoning structure for the task using these adapted reasoning modules:\n{}\n\n{}".format(adapted_modules, task_description)
-    user_prompt += '\nPlease respond in this JSON format: {"reasoning_structure": ["structure_1 for adapted module_1", "structure_2 for adapted module_2", ...]}'
-    reasoning_structure = solver.chat(user_prompt=user_prompt)
-    print(reasoning_structure)
+    user_prompt = "\n{}\nDescribe the relashionships between input_pixel_coords and output_pixel_coords".format(task_description)
+    user_prompt += '\nPlease respond in this JSON format: {"pixel_coords_observations": ["pixel coords changes for pair1", "pixel coords changes for pair2", ...]}'
+    pixel_coords_changes = solver.chat(user_prompt=user_prompt)
+    print(pixel_coords_changes)
+
+    user_prompt = "\n{}\nDescribe the relashionships between 'input' and 'output'".format(task_description)
+    user_prompt += '\nPlease respond in this JSON format: {"grid_observations": ["grid changes for pair1", "grid changes for pair2", ...]}'
+    grid_obs = solver.chat(user_prompt=user_prompt)
+    print(grid_obs)
+
+    user_prompt = "\n{}\nSummarize the following observations about the input-output pairs and infer the transformation between the pairs:\n{}\n{}\n{}".format(task_description, grid_size_obs, obj_obs, grid_obs)
+    user_prompt += '\nUse all examples of "train" input-output pairs and please use the actual number.'
+    user_prompt += '\nPlease respond in this JSON format: {"relationship": "...", "reasoning_on_pair": ["reasoning for how the proposed transformation transorms input 1 to output 1", ...]}'
+    reasoning = solver.chat(user_prompt=user_prompt)
+    print(reasoning)
 
     # EXECUTE
     retries = 5
@@ -196,14 +179,12 @@ def solve_arc_question(task_json, task_file_path, output_id):
     feedback_prompt = ""
     response_format = {
       "reflection": "reflect on the answer from the previous iteration if there is an error or failed to match prediction to groundtruth output",
-      "pixel_changes": "describe the changes between the input and output pixels, focusing on movement or pattern changes",
-      "object_changes": "describe the changes between the input and output objects, focusing on movement, object number, size, shape, position, value, cell count",
-      "helper_functions": "list any relevant helper_functions for this task",
       "overall_pattern": "describe the simplest input-output relationship for all input-output pairs",
+      "helper_functions": "list any relevant helper_functions for this task",
       "program_instructions": "Plan how to write the python function and what helper functions and conditions to use. Use a training input-output pair as an example to test your thought process",
       "python_program": "Python function named 'transform_grid' that takes in a 2D grid and generates a 2D grid. Output as a string in a single line with \n and \t."
     }
-    user_prompt =  "With this reasoning structure:\n{}\n\n{}\n".format(reasoning_structure, task_description)
+    user_prompt =  "With this reasoning:\n{}\n\n{}, write a program that transforms the input 2d grid to the output 2d grid for every pair of input-ouput in 'train'.\n".format(reasoning, task_description)
     user_prompt += "Please respond in this JSON format:\n{}".format(response_format)
     for i in range(retries):
         print("Solving for the {} time".format(i + 1))
@@ -221,8 +202,7 @@ def solve_arc_question(task_json, task_file_path, output_id):
         solution["passed"] = True
         for question in task_json_buf["train"]:
             solution["passed"] = question["passed"]
-        output = convert_char_grid_to_int(result["test"][output_id]["predicted_output"])
-        solution["output"] = output
+        solution["prediction"] = result["test"]
         solution["solver_response"] = solver_response
         solution["python_program"] = solver_response["python_program"]
 
@@ -274,6 +254,7 @@ if __name__ == "__main__":
     #task_files = os.listdir(folder)
     folder = './evaluation/'
     task_files = os.listdir(folder)
+    #task_files = ["e57337a4.json", "f3e62deb.json"]
     success_count = 0
     attempt_count = 0
     result_folder = "results"
@@ -297,16 +278,16 @@ if __name__ == "__main__":
 
         # for each question within each task, append a flattened output
         # with the corresponding {task_id}_{output_id}
-        for output_id, question in enumerate(task_data["test"]):
-            print("solving for task {} output_id {}".format(task_id, output_id))
-            output = [[0]]
-            try:
-                solution = solve_arc_question(task_data, task_file_path, output_id)
-                output = solution["output"]
-            except Exception as err:
-                print("Error encountered during answering for task {}, error: {}".format(task_id, err))
-                #raise
+        print("solving for task {}".format(task_id))
+        output = [[0]]
+        try:
+            solution = solve_arc_question(task_data)
+        except Exception as err:
+            print("Error encountered during answering for task {}, error: {}".format(task_id, err))
+            raise
 
+        for output_id, question in enumerate(task_data["test"]):
+            output = convert_char_grid_to_int(solution["prediction"][output_id]["predicted_output"])
             groundtruth = None
             if "output" in task_data["test"][output_id]:
                 groundtruth = task_data["test"][output_id]["output"]
@@ -324,8 +305,8 @@ if __name__ == "__main__":
             print("Success count {}/{}".format(success_count, attempt_count))
 
             # uncomment to view dataset visualization
-            #test_input = task_data["test"][output_id]["input"]
-            #show_image_from_json(task_data, test_input, output, groundtruth)
+            test_input = task_data["test"][output_id]["input"]
+            show_image_from_json(task_data, test_input, output, groundtruth)
 
 
         # write out the submission.csv according to ARC requirement
